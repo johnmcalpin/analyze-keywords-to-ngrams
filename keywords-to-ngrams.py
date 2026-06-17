@@ -1,6 +1,7 @@
 #Import necessary libraries
 import re
 from collections import Counter
+from openpyxl import Workbook
 
 #Open the text file and read its contents into a list of words
 with open('keywords.txt', 'r') as f:
@@ -8,6 +9,13 @@ with open('keywords.txt', 'r') as f:
 
 #Use a regular expression to remove any non-alphabetic characters from the words
 words = [re.sub(r'[^a-zA-Z]', '', word) for word in words]
+
+#Load stop words and apply the same cleaning so contractions/punctuation match up
+with open('src/stop-words.txt', 'r') as f:
+    stop_words = {re.sub(r'[^a-zA-Z]', '', w).lower() for w in f.read().split(',')}
+
+#Remove stop words and any empty strings left over from cleaning
+words = [word for word in words if word.lower() not in stop_words and word]
 
 #Initialize empty dictionaries for storing the unigrams, bigrams, and trigrams
 unigrams = {}
@@ -44,7 +52,7 @@ sorted_bigrams = sorted(bigrams.items(), key=lambda x: x[1], reverse=True)
 sorted_trigrams = sorted(trigrams.items(), key=lambda x: x[1], reverse=True)
 
 # Write the results to a text file
-with open('results.txt', 'w') as f:
+with open('results-summary.txt', 'w') as f:
     f.write("Most common unigrams:\n")
     for unigram, count in sorted_unigrams[:10]:
         f.write(unigram + ": " + str(count) + "\n")
@@ -54,3 +62,18 @@ with open('results.txt', 'w') as f:
     f.write("\nMost common trigrams:\n")
     for trigram, count in sorted_trigrams[:10]:
         f.write(trigram + ": " + str(count) + "\n")
+
+# Write the full results to an Excel file, one sheet per ngram type
+workbook = Workbook()
+sheets = [
+    ("Unigrams", sorted_unigrams),
+    ("Bigrams", sorted_bigrams),
+    ("Trigrams", sorted_trigrams),
+]
+for index, (sheet_name, sorted_ngrams) in enumerate(sheets):
+    sheet = workbook.active if index == 0 else workbook.create_sheet()
+    sheet.title = sheet_name
+    sheet.append(["Phrase", "Occurrences"])
+    for phrase, count in sorted_ngrams:
+        sheet.append([phrase, count])
+workbook.save('results-summary.xlsx')
